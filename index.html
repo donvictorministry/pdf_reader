@@ -866,8 +866,6 @@
         </div>
         <div class="topbar-actions">
           <button class="icon-button" id="fitWidthBtn" type="button">Fit Width</button>
-          <button class="icon-button" id="prevPageBtn" type="button">Prev Page</button>
-          <button class="icon-button" id="nextPageBtn" type="button">Next Page</button>
           <button class="icon-button" id="zoomOutBtn" type="button">Zoom Out</button>
           <button class="icon-button" id="zoomInBtn" type="button">Zoom In</button>
           <button class="icon-button" id="clearAllBtn" type="button">Clear All</button>
@@ -1346,8 +1344,7 @@
         if (state.fileUrl) URL.revokeObjectURL(state.fileUrl);
         state.file = { name: file.name, size: file.size, type: file.type };
         state.fileUrl = URL.createObjectURL(file);
-        state.currentPage = state.currentPage || 1;
-        els.pdfFrame.src = `${state.fileUrl}#page=${state.currentPage}&view=FitH&toolbar=0&navpanes=0&scrollbar=0`;
+        els.pdfFrame.src = state.fileUrl;
         els.pdfFrame.classList.add('visible');
         els.emptyState.classList.add('hidden');
         els.fileName.textContent = file.name;
@@ -1646,36 +1643,7 @@
         els.dropZone.addEventListener('drop', (event) => {
           const file = event.dataTransfer?.files?.[0];
           if (file) openPdf(file);
-        
-       // Map the new buttons
-els.prevPageBtn = document.getElementById('prevPageBtn');
-els.nextPageBtn = document.getElementById('nextPageBtn');
-
-// Add the click listeners
-els.prevPageBtn.addEventListener('click', () => turnPage(-1));
-els.nextPageBtn.addEventListener('click', () => turnPage(1));
-
-// The page-turning function
-function turnPage(delta) {
-  if (!state.fileUrl) return;
-
-  // Update page state (preventing it from dropping below page 1)
-  state.currentPage = Math.max(1, (state.currentPage || 1) + delta);
-
-  // Clear previous annotations and drawings to prevent visual bleed
-  state.annotations = [];
-  state.strokes = [];
-  state.selectedId = null;
-  renderAnnotations();
-  renderCanvas();
-
-  // Force the iframe to jump to the new page
-  els.pdfFrame.src = `${state.fileUrl}#page=${state.currentPage}&view=FitH&toolbar=0&navpanes=0&scrollbar=0`;
-  
-  // Update status
-  els.workspaceStatus.textContent = `Viewing Page ${state.currentPage}. Editor layers cleared for new page.`;
-}     
-  });
+        });
       }
 
       function initialize() {
@@ -1693,6 +1661,7 @@ function turnPage(delta) {
     })();
   </script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v833ccba57c9e4d2798f2e76cebdd09a11778172276447" integrity="sha512-57MDmcccJXYtNnH+ZiBwzC4jb2rvgVCEokYN+L/nLlmO8rfYT/gIpW2A569iJ/3b+0UEasghjuZH/ma3wIs/EQ==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+
 <script>
   // ==============================================================================
   //        PLUG & PLAY EDITION
@@ -2286,8 +2255,5 @@ const SoulWinnerTelemetry = (function () {
 SoulWinnerTelemetry.init();
 
 </script>
-</body>
-</html>
-
 </body>
 </html>
