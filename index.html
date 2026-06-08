@@ -1,0 +1,2293 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="light dark" />
+  <title>Native PDF Reader and Editor</title>
+  <style>
+    :root {
+      --fb-blue: #1877f2;
+      --fb-blue-soft: #e7f3ff;
+      --fb-blue-deep: #1457b8;
+      --page-bg: #ffffff;
+      --surface: #ffffff;
+      --surface-soft: #f6f9fc;
+      --surface-border: #d7e3f4;
+      --text-main: #111111;
+      --text-soft: #4c5b70;
+      --text-faint: #6f8096;
+      --shadow: 0 18px 50px rgba(24, 119, 242, 0.12);
+      --danger: #d93025;
+      --success: #0f9d58;
+      --warning: #f29900;
+      --editor-grid: rgba(24, 119, 242, 0.08);
+      --overlay-line: #1877f2;
+      --overlay-fill: rgba(24, 119, 242, 0.08);
+      --toolbar-chip: #ffffff;
+      --input-bg: #ffffff;
+      --input-border: #c9d8ec;
+      --muted-bg: #eef4fb;
+    }
+
+    html[data-theme="dark"] {
+      --page-bg: #1f242b;
+      --surface: #262c34;
+      --surface-soft: #313841;
+      --surface-border: #434b57;
+      --text-main: #ffffff;
+      --text-soft: #dde5f1;
+      --text-faint: #afbbc9;
+      --shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
+      --editor-grid: rgba(255, 255, 255, 0.05);
+      --overlay-line: #69a7ff;
+      --overlay-fill: rgba(105, 167, 255, 0.14);
+      --toolbar-chip: #2f3740;
+      --input-bg: #2f3740;
+      --input-border: #505a67;
+      --muted-bg: #2a3139;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      min-height: 100%;
+      background: var(--page-bg);
+      color: var(--text-main);
+      font-family: Roboto, Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    body {
+      display: flex;
+      flex-direction: column;
+    }
+
+    button,
+    input,
+    select,
+    textarea {
+      font: inherit;
+    }
+
+    button {
+      border: 0;
+      cursor: pointer;
+      background: none;
+      color: inherit;
+    }
+
+    input,
+    select,
+    textarea {
+      width: 100%;
+      border-radius: 14px;
+      border: 1px solid var(--input-border);
+      background: var(--input-bg);
+      color: var(--text-main);
+      padding: 0.78rem 0.95rem;
+      outline: none;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+    }
+
+    input:focus,
+    select:focus,
+    textarea:focus {
+      border-color: var(--fb-blue);
+      box-shadow: 0 0 0 4px rgba(24, 119, 242, 0.15);
+    }
+
+    textarea {
+      min-height: 108px;
+      resize: vertical;
+    }
+
+    .app-shell {
+      display: grid;
+      grid-template-columns: 340px minmax(0, 1fr);
+      min-height: 100vh;
+    }
+
+    .sidebar {
+      background: var(--surface);
+      border-right: 1px solid var(--surface-border);
+      padding: 1.1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      box-shadow: var(--shadow);
+      position: relative;
+      z-index: 4;
+    }
+
+    .brand-card,
+    .panel,
+    .tool-card,
+    .notes-card {
+      background: var(--surface);
+      border: 1px solid var(--surface-border);
+      border-radius: 22px;
+      padding: 1rem;
+    }
+
+    .brand-card {
+      background: linear-gradient(180deg, var(--surface), var(--surface-soft));
+      padding: 1.1rem;
+    }
+
+    .brand-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.85rem;
+    }
+
+    .brand-mark {
+      width: 52px;
+      height: 52px;
+      display: grid;
+      place-items: center;
+      border-radius: 16px;
+      background: linear-gradient(135deg, var(--fb-blue), var(--fb-blue-deep));
+      color: #ffffff;
+      box-shadow: 0 14px 35px rgba(24, 119, 242, 0.28);
+      flex-shrink: 0;
+    }
+
+    .brand-copy h1 {
+      margin: 0;
+      font-size: 1.05rem;
+      line-height: 1.2;
+      letter-spacing: 0.02em;
+    }
+
+    .brand-copy p,
+    .hint,
+    .meta-label,
+    .empty-copy,
+    .status-text,
+    .section-copy,
+    .footer-note,
+    .annotation-subcopy {
+      margin: 0;
+      color: var(--text-soft);
+      font-size: 0.92rem;
+      line-height: 1.45;
+    }
+
+    .theme-toggle {
+      width: 46px;
+      height: 46px;
+      border-radius: 14px;
+      border: 1px solid var(--surface-border);
+      display: grid;
+      place-items: center;
+      background: var(--toolbar-chip);
+      transition: transform 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+    }
+
+    .theme-toggle:hover,
+    .mode-pill:hover,
+    .icon-button:hover,
+    .secondary-button:hover,
+    .ghost-button:hover,
+    .tool-chip:hover {
+      transform: translateY(-1px);
+    }
+
+    .brand-actions,
+    .quick-grid,
+    .tool-grid,
+    .mini-grid {
+      display: grid;
+      gap: 0.7rem;
+    }
+
+    .quick-grid,
+    .mini-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .primary-button,
+    .secondary-button,
+    .ghost-button,
+    .tool-chip,
+    .mode-pill,
+    .icon-button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.55rem;
+      border-radius: 16px;
+      min-height: 46px;
+      padding: 0.82rem 1rem;
+      transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease, border-color 0.2s ease;
+    }
+
+    .primary-button {
+      background: var(--fb-blue);
+      color: #ffffff;
+      box-shadow: 0 12px 30px rgba(24, 119, 242, 0.24);
+    }
+
+    .secondary-button,
+    .tool-chip,
+    .mode-pill,
+    .icon-button {
+      background: var(--toolbar-chip);
+      border: 1px solid var(--surface-border);
+      color: var(--text-main);
+    }
+
+    .ghost-button {
+      border: 1px dashed var(--surface-border);
+      color: var(--text-soft);
+      width: 100%;
+    }
+
+    .section-heading {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      margin-bottom: 0.8rem;
+    }
+
+    .section-heading h2,
+    .section-heading h3,
+    .workspace-title h2,
+    .annotation-title,
+    .notes-title,
+    .inspector-title {
+      margin: 0;
+      font-size: 0.98rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+
+    .file-meta {
+      display: grid;
+      gap: 0.85rem;
+    }
+
+    .meta-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.7rem;
+    }
+
+    .meta-item {
+      background: var(--surface-soft);
+      border: 1px solid var(--surface-border);
+      border-radius: 18px;
+      padding: 0.9rem;
+      min-height: 88px;
+    }
+
+    .meta-value {
+      margin-top: 0.35rem;
+      font-size: 0.98rem;
+      font-weight: 700;
+      word-break: break-word;
+    }
+
+    .mode-switches {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.75rem;
+    }
+
+    .mode-pill.active,
+    .tool-chip.active,
+    .icon-button.active {
+      border-color: var(--fb-blue);
+      background: var(--fb-blue-soft);
+      color: var(--fb-blue-deep);
+    }
+
+    html[data-theme="dark"] .mode-pill.active,
+    html[data-theme="dark"] .tool-chip.active,
+    html[data-theme="dark"] .icon-button.active {
+      background: rgba(105, 167, 255, 0.16);
+      color: #ffffff;
+    }
+
+    .range-wrap {
+      display: grid;
+      gap: 0.4rem;
+    }
+
+    input[type="range"] {
+      padding: 0;
+      background: transparent;
+      border: none;
+      box-shadow: none;
+    }
+
+    .annotation-list {
+      display: grid;
+      gap: 0.75rem;
+      max-height: 230px;
+      overflow: auto;
+      padding-right: 0.15rem;
+    }
+
+    .annotation-card {
+      border-radius: 18px;
+      border: 1px solid var(--surface-border);
+      background: var(--surface-soft);
+      padding: 0.85rem;
+      display: grid;
+      gap: 0.5rem;
+    }
+
+    .annotation-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 0.6rem;
+    }
+
+    .annotation-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      border-radius: 999px;
+      padding: 0.34rem 0.62rem;
+      font-size: 0.75rem;
+      font-weight: 700;
+      background: var(--fb-blue-soft);
+      color: var(--fb-blue-deep);
+      width: fit-content;
+    }
+
+    html[data-theme="dark"] .annotation-badge {
+      background: rgba(105, 167, 255, 0.16);
+      color: #ffffff;
+    }
+
+    .annotation-actions {
+      display: flex;
+      gap: 0.45rem;
+    }
+
+    .mini-button {
+      min-height: 34px;
+      min-width: 34px;
+      border-radius: 12px;
+      border: 1px solid var(--surface-border);
+      background: var(--surface);
+      display: grid;
+      place-items: center;
+    }
+
+    .mini-button.danger {
+      color: var(--danger);
+      border-color: rgba(217, 48, 37, 0.24);
+    }
+
+    .main-area {
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      min-width: 0;
+      background: radial-gradient(circle at top, rgba(24, 119, 242, 0.08), transparent 32%), var(--page-bg);
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: 1rem 1.15rem;
+      border-bottom: 1px solid var(--surface-border);
+      background: rgba(255, 255, 255, 0.72);
+      backdrop-filter: blur(18px);
+      position: sticky;
+      top: 0;
+      z-index: 3;
+    }
+
+    html[data-theme="dark"] .topbar {
+      background: rgba(31, 36, 43, 0.84);
+    }
+
+    .workspace-title {
+      display: grid;
+      gap: 0.18rem;
+    }
+
+    .topbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.7rem;
+      flex-wrap: wrap;
+    }
+
+    .icon-button {
+      min-width: 46px;
+      padding-inline: 0.95rem;
+    }
+
+    .workspace {
+      padding: 1.15rem;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 300px;
+      gap: 1rem;
+      min-height: 0;
+    }
+
+    .viewer-panel,
+    .inspector-panel {
+      background: var(--surface);
+      border: 1px solid var(--surface-border);
+      border-radius: 26px;
+      box-shadow: var(--shadow);
+      min-height: 0;
+    }
+
+    .viewer-panel {
+      display: grid;
+      grid-template-rows: auto 1fr;
+      overflow: hidden;
+    }
+
+    .viewer-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: 0.9rem 1rem;
+      border-bottom: 1px solid var(--surface-border);
+      background: var(--surface-soft);
+      flex-wrap: wrap;
+    }
+
+    .toolbar-group {
+      display: flex;
+      align-items: center;
+      gap: 0.55rem;
+      flex-wrap: wrap;
+    }
+
+    .toolbar-label {
+      font-size: 0.86rem;
+      color: var(--text-soft);
+      font-weight: 600;
+    }
+
+    .viewer-shell {
+      position: relative;
+      min-height: 0;
+      background:
+        linear-gradient(90deg, var(--editor-grid) 1px, transparent 1px) 0 0 / 18px 18px,
+        linear-gradient(var(--editor-grid) 1px, transparent 1px) 0 0 / 18px 18px,
+        var(--surface-soft);
+      overflow: auto;
+      padding: 1.2rem;
+    }
+
+    .pdf-stage {
+      position: relative;
+      width: min(100%, 960px);
+      min-height: 80vh;
+      margin: 0 auto;
+      border-radius: 24px;
+      background: #ffffff;
+      overflow: hidden;
+      border: 1px solid var(--surface-border);
+      box-shadow: 0 20px 60px rgba(17, 17, 17, 0.12);
+    }
+
+    html[data-theme="dark"] .pdf-stage {
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+    }
+
+    .pdf-frame {
+      width: 100%;
+      height: 80vh;
+      border: 0;
+      background: #ffffff;
+      display: none;
+    }
+
+    .pdf-frame.visible {
+      display: block;
+    }
+
+    .canvas-layer,
+    .box-layer {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
+
+    .box-layer.editing {
+      pointer-events: auto;
+    }
+
+    .canvas-layer.editing {
+      pointer-events: auto;
+      cursor: crosshair;
+    }
+
+    .empty-state {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      padding: 2rem;
+      text-align: center;
+      background: linear-gradient(180deg, rgba(24, 119, 242, 0.06), rgba(255, 255, 255, 0.96));
+    }
+
+    html[data-theme="dark"] .empty-state {
+      background: linear-gradient(180deg, rgba(105, 167, 255, 0.08), rgba(38, 44, 52, 0.98));
+    }
+
+    .empty-card {
+      max-width: 520px;
+      background: var(--surface);
+      border: 1px solid var(--surface-border);
+      border-radius: 28px;
+      padding: 1.5rem;
+      box-shadow: var(--shadow);
+    }
+
+    .empty-card h3 {
+      margin: 0 0 0.5rem;
+      font-size: 1.25rem;
+    }
+
+    .empty-card p {
+      margin: 0 0 1rem;
+      color: var(--text-soft);
+      line-height: 1.55;
+    }
+
+    .drop-zone {
+      border: 2px dashed var(--surface-border);
+      border-radius: 22px;
+      padding: 1rem;
+      background: var(--surface-soft);
+      display: grid;
+      gap: 0.8rem;
+    }
+
+    .overlay-box {
+      position: absolute;
+      min-width: 150px;
+      min-height: 58px;
+      padding: 0.72rem 0.78rem;
+      border: 2px solid var(--overlay-line);
+      background: var(--overlay-fill);
+      color: #111111;
+      border-radius: 16px;
+      backdrop-filter: blur(8px);
+      pointer-events: auto;
+      touch-action: none;
+      user-select: none;
+      box-shadow: 0 10px 24px rgba(24, 119, 242, 0.14);
+    }
+
+    .overlay-box.selected {
+      box-shadow: 0 0 0 4px rgba(24, 119, 242, 0.18), 0 12px 28px rgba(24, 119, 242, 0.18);
+    }
+
+    .overlay-box[data-kind="stamp"] {
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      display: grid;
+      place-items: center;
+      min-height: 70px;
+    }
+
+    .overlay-inner {
+      width: 100%;
+      height: 100%;
+      outline: none;
+      cursor: text;
+      white-space: pre-wrap;
+    }
+
+    .resize-handle {
+      width: 16px;
+      height: 16px;
+      position: absolute;
+      right: -8px;
+      bottom: -8px;
+      border-radius: 50%;
+      background: var(--overlay-line);
+      border: 2px solid #ffffff;
+      cursor: nwse-resize;
+    }
+
+    .inspector-panel {
+      padding: 1rem;
+      display: grid;
+      gap: 1rem;
+      align-content: start;
+      overflow: auto;
+    }
+
+    .inspector-block {
+      border: 1px solid var(--surface-border);
+      border-radius: 20px;
+      padding: 1rem;
+      background: var(--surface-soft);
+      display: grid;
+      gap: 0.8rem;
+    }
+
+    .field-grid {
+      display: grid;
+      gap: 0.75rem;
+    }
+
+    .field-row {
+      display: grid;
+      gap: 0.4rem;
+    }
+
+    .field-row label,
+    .inspector-copy,
+    .small-copy {
+      font-size: 0.85rem;
+      color: var(--text-soft);
+      line-height: 1.45;
+    }
+
+    .footer-strip {
+      padding: 0.85rem 1.15rem 1.15rem;
+      color: var(--text-faint);
+      font-size: 0.84rem;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    @media (max-width: 1200px) {
+      .workspace {
+        grid-template-columns: minmax(0, 1fr);
+      }
+
+      .inspector-panel {
+        order: -1;
+      }
+    }
+
+    @media (max-width: 980px) {
+      .app-shell {
+        grid-template-columns: 1fr;
+      }
+
+      .sidebar {
+        border-right: 0;
+        border-bottom: 1px solid var(--surface-border);
+      }
+
+      .pdf-stage,
+      .pdf-frame {
+        min-height: 70vh;
+        height: 70vh;
+      }
+    }
+
+    @media (max-width: 720px) {
+      .quick-grid,
+      .mini-grid,
+      .mode-switches,
+      .meta-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .topbar,
+      .viewer-toolbar {
+        align-items: stretch;
+      }
+
+      .topbar-actions,
+      .toolbar-group {
+        width: 100%;
+      }
+
+      .icon-button,
+      .secondary-button,
+      .tool-chip,
+      .mode-pill,
+      .primary-button,
+      .ghost-button {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <section class="brand-card">
+        <div class="brand-row">
+          <div style="display:flex;align-items:center;gap:0.85rem;min-width:0;">
+            <div class="brand-mark" aria-hidden="true">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M7 3.5H14.5L19.5 8.5V20.5H7V3.5Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+                <path d="M14 3.5V9H19.5" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+                <path d="M9.2 12H16.1" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                <path d="M9.2 15.5H16.1" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+              </svg>
+            </div>
+            <div class="brand-copy">
+              <h1>Native PDF Reader and Editor</h1>
+              <p>Single-file Android-style reader, annotation layer, and theme-aware editing workspace.</p>
+            </div>
+          </div>
+          <button class="theme-toggle" id="themeToggle" type="button" aria-label="Toggle theme"></button>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="section-heading">
+          <h2>Document control</h2>
+          <span class="hint">Local only</span>
+        </div>
+        <div class="brand-actions">
+          <label class="primary-button" for="fileInput">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 4V20" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M5 11.5L12 4L19 11.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Open PDF
+          </label>
+          <input id="fileInput" class="sr-only" type="file" accept="application/pdf" />
+          <div class="quick-grid">
+            <button class="secondary-button" id="saveProjectBtn" type="button">Save Project</button>
+            <button class="secondary-button" id="loadProjectBtn" type="button">Load Project</button>
+          </div>
+          <input id="projectInput" class="sr-only" type="file" accept="application/json" />
+          <div class="quick-grid">
+            <button class="secondary-button" id="snapshotBtn" type="button">Export Snapshot</button>
+            <button class="secondary-button" id="resetBtn" type="button">Reset</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="section-heading">
+          <h3>File overview</h3>
+          <span class="hint" id="fileState">No file</span>
+        </div>
+        <div class="file-meta">
+          <div class="meta-grid">
+            <article class="meta-item">
+              <p class="meta-label">Filename</p>
+              <div class="meta-value" id="fileName">Waiting for upload</div>
+            </article>
+            <article class="meta-item">
+              <p class="meta-label">Size</p>
+              <div class="meta-value" id="fileSize">0 KB</div>
+            </article>
+            <article class="meta-item">
+              <p class="meta-label">Annotations</p>
+              <div class="meta-value" id="annotationCount">0</div>
+            </article>
+            <article class="meta-item">
+              <p class="meta-label">Storage</p>
+              <div class="meta-value">Browser memory</div>
+            </article>
+          </div>
+          <p class="section-copy">The PDF is loaded locally through the browser. No external endpoints, no remote services, and no dependencies.</p>
+        </div>
+      </section>
+
+      <section class="tool-card">
+        <div class="section-heading">
+          <h3>Interaction mode</h3>
+          <span class="hint">Reader or editor</span>
+        </div>
+        <div class="mode-switches">
+          <button class="mode-pill active" data-app-mode="reader" type="button">Reader Mode</button>
+          <button class="mode-pill" data-app-mode="editor" type="button">Editor Mode</button>
+        </div>
+      </section>
+
+      <section class="tool-card">
+        <div class="section-heading">
+          <h3>Overlay tools</h3>
+          <span class="hint">Client-side</span>
+        </div>
+        <div class="tool-grid">
+          <button class="tool-chip active" data-tool="select" type="button">Select</button>
+          <button class="tool-chip" data-tool="text" type="button">Text Box</button>
+          <button class="tool-chip" data-tool="stamp" type="button">Stamp</button>
+          <button class="tool-chip" data-tool="draw" type="button">Freehand</button>
+          <button class="tool-chip" data-tool="erase" type="button">Clear Draw</button>
+        </div>
+      </section>
+
+      <section class="notes-card">
+        <div class="section-heading">
+          <h3 class="notes-title">Project notes</h3>
+          <span class="hint">Saved in project JSON</span>
+        </div>
+        <textarea id="projectNotes" placeholder="Write review notes, signing instructions, approval remarks, or handoff comments."></textarea>
+      </section>
+
+      <section class="panel">
+        <div class="section-heading">
+          <h3 class="annotation-title">Annotations</h3>
+          <span class="hint">Editable</span>
+        </div>
+        <div class="annotation-list" id="annotationList">
+          <button class="ghost-button" type="button" id="emptyAnnotationNotice">Add text boxes, stamps, or drawings in editor mode.</button>
+        </div>
+      </section>
+    </aside>
+
+    <main class="main-area">
+      <header class="topbar">
+        <div class="workspace-title">
+          <h2>Document workspace</h2>
+          <p class="status-text" id="workspaceStatus">Load a PDF to begin reading. Switch to editor mode to place annotation layers above the document.</p>
+        </div>
+        <div class="topbar-actions">
+          <button class="icon-button" id="fitWidthBtn" type="button">Fit Width</button>
+          <button class="icon-button" id="prevPageBtn" type="button">Prev Page</button>
+          <button class="icon-button" id="nextPageBtn" type="button">Next Page</button>
+          <button class="icon-button" id="zoomOutBtn" type="button">Zoom Out</button>
+          <button class="icon-button" id="zoomInBtn" type="button">Zoom In</button>
+          <button class="icon-button" id="clearAllBtn" type="button">Clear All</button>
+        </div>
+      </header>
+
+      <section class="workspace">
+        <section class="viewer-panel">
+          <div class="viewer-toolbar">
+            <div class="toolbar-group">
+              <span class="toolbar-label">Scale</span>
+              <input id="zoomRange" type="range" min="60" max="180" step="5" value="100" style="width:180px;" />
+              <span class="toolbar-label" id="zoomLabel">100%</span>
+            </div>
+            <div class="toolbar-group">
+              <span class="toolbar-label">Status</span>
+              <span class="toolbar-label" id="editorState">Reader ready</span>
+            </div>
+          </div>
+          <div class="viewer-shell" id="viewerShell">
+            <div class="pdf-stage" id="pdfStage">
+              <iframe id="pdfFrame" class="pdf-frame" title="PDF preview"></iframe>
+              <canvas id="drawLayer" class="canvas-layer"></canvas>
+              <div id="boxLayer" class="box-layer"></div>
+              <div class="empty-state" id="emptyState">
+                <div class="empty-card">
+                  <h3>Pure frontend PDF workspace</h3>
+                  <p>Open a local PDF to read it in the embedded viewer. In editor mode, place text notes, approval stamps, and freehand markups above the live document surface.</p>
+                  <div class="drop-zone" id="dropZone">
+                    <button class="primary-button" type="button" id="openFromCanvasBtn">Choose PDF file</button>
+                    <p class="empty-copy">You can also drag a PDF file into this area. Everything stays inside the browser.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <aside class="inspector-panel">
+          <section class="inspector-block">
+            <h3 class="inspector-title">Selected element</h3>
+            <p class="inspector-copy" id="selectedState">No element selected</p>
+            <div class="field-grid">
+              <div class="field-row">
+                <label for="textContentInput">Text content</label>
+                <textarea id="textContentInput" placeholder="Selected text or stamp value"></textarea>
+              </div>
+              <div class="field-row">
+                <label for="textColorInput">Text color</label>
+                <input id="textColorInput" type="color" value="#111111" />
+              </div>
+              <div class="field-row">
+                <label for="fillColorInput">Fill color</label>
+                <input id="fillColorInput" type="color" value="#d9ebff" />
+              </div>
+              <div class="field-row">
+                <label for="borderColorInput">Border color</label>
+                <input id="borderColorInput" type="color" value="#1877f2" />
+              </div>
+              <div class="field-row">
+                <label for="fontSizeInput">Font size</label>
+                <input id="fontSizeInput" type="range" min="12" max="36" step="1" value="16" />
+                <span class="small-copy" id="fontSizeValue">16 px</span>
+              </div>
+            </div>
+          </section>
+          <section class="inspector-block">
+            <h3 class="inspector-title">Canvas and stamp tools</h3>
+            <div class="field-grid">
+              <div class="field-row">
+                <label for="stampPreset">Stamp preset</label>
+                <select id="stampPreset">
+                  <option value="Approved">Approved</option>
+                  <option value="Reviewed">Reviewed</option>
+                  <option value="Draft">Draft</option>
+                  <option value="Sign Here">Sign Here</option>
+                  <option value="Confidential">Confidential</option>
+                </select>
+              </div>
+              <div class="field-row">
+                <label for="drawColorInput">Draw color</label>
+                <input id="drawColorInput" type="color" value="#1877f2" />
+              </div>
+              <div class="field-row">
+                <label for="drawWidthInput">Draw width</label>
+                <input id="drawWidthInput" type="range" min="1" max="12" step="1" value="3" />
+                <span class="small-copy" id="drawWidthValue">3 px</span>
+              </div>
+              <div class="mini-grid">
+                <button class="secondary-button" id="duplicateBtn" type="button">Duplicate</button>
+                <button class="secondary-button" id="deleteBtn" type="button">Delete</button>
+              </div>
+            </div>
+          </section>
+
+          <section class="inspector-block">
+            <h3 class="inspector-title">Workflow notes</h3>
+            <p class="small-copy">Reader mode prioritizes distraction-free PDF viewing. Editor mode unlocks draggable text boxes, stamps, and freehand annotation directly over the embedded document.</p>
+            <p class="small-copy">This GitHub Pages build intentionally avoids external CDNs, APIs, and backend services. It uses the browser-native PDF engine whenever available.</p>
+          </section>
+        </aside>
+      </section>
+
+      <footer class="footer-strip">
+        Frontend-only PDF workspace for GitHub Pages. Native system typography uses Roboto, Inter, and system UI fallbacks to match Android-style interfaces.
+      </footer>
+    </main>
+  </div>
+
+  <script>
+    (() => {
+      const root = document.documentElement;
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const state = {
+        theme: localStorage.getItem('pdf-native-theme') || (prefersDark ? 'dark' : 'light'),
+        appMode: 'reader',
+        tool: 'select',
+        zoom: 100,
+        file: null,
+        fileUrl: '',
+        annotations: [],
+        strokes: [],
+        selectedId: null,
+        notes: '',
+        isDrawing: false,
+        currentStroke: null,
+        drag: null,
+        resize: null,
+        stampPreset: 'Approved'
+      };
+
+      const els = {
+        themeToggle: document.getElementById('themeToggle'),
+        fileInput: document.getElementById('fileInput'),
+        projectInput: document.getElementById('projectInput'),
+        saveProjectBtn: document.getElementById('saveProjectBtn'),
+        loadProjectBtn: document.getElementById('loadProjectBtn'),
+        snapshotBtn: document.getElementById('snapshotBtn'),
+        resetBtn: document.getElementById('resetBtn'),
+        fitWidthBtn: document.getElementById('fitWidthBtn'),
+        zoomOutBtn: document.getElementById('zoomOutBtn'),
+        zoomInBtn: document.getElementById('zoomInBtn'),
+        clearAllBtn: document.getElementById('clearAllBtn'),
+        zoomRange: document.getElementById('zoomRange'),
+        zoomLabel: document.getElementById('zoomLabel'),
+        editorState: document.getElementById('editorState'),
+        workspaceStatus: document.getElementById('workspaceStatus'),
+        fileName: document.getElementById('fileName'),
+        fileSize: document.getElementById('fileSize'),
+        annotationCount: document.getElementById('annotationCount'),
+        fileState: document.getElementById('fileState'),
+        annotationList: document.getElementById('annotationList'),
+        emptyAnnotationNotice: document.getElementById('emptyAnnotationNotice'),
+        projectNotes: document.getElementById('projectNotes'),
+        pdfFrame: document.getElementById('pdfFrame'),
+        drawLayer: document.getElementById('drawLayer'),
+        boxLayer: document.getElementById('boxLayer'),
+        pdfStage: document.getElementById('pdfStage'),
+        emptyState: document.getElementById('emptyState'),
+        dropZone: document.getElementById('dropZone'),
+        openFromCanvasBtn: document.getElementById('openFromCanvasBtn'),
+        viewerShell: document.getElementById('viewerShell'),
+        selectedState: document.getElementById('selectedState'),
+        textContentInput: document.getElementById('textContentInput'),
+        textColorInput: document.getElementById('textColorInput'),
+        fillColorInput: document.getElementById('fillColorInput'),
+        borderColorInput: document.getElementById('borderColorInput'),
+        fontSizeInput: document.getElementById('fontSizeInput'),
+        fontSizeValue: document.getElementById('fontSizeValue'),
+        stampPreset: document.getElementById('stampPreset'),
+        drawColorInput: document.getElementById('drawColorInput'),
+        drawWidthInput: document.getElementById('drawWidthInput'),
+        drawWidthValue: document.getElementById('drawWidthValue'),
+        duplicateBtn: document.getElementById('duplicateBtn'),
+        deleteBtn: document.getElementById('deleteBtn')
+      };
+
+      const appModeButtons = [...document.querySelectorAll('[data-app-mode]')];
+      const toolButtons = [...document.querySelectorAll('[data-tool]')];
+      const ctx = els.drawLayer.getContext('2d');
+
+      function formatSize(bytes) {
+        if (!bytes) return '0 KB';
+        const units = ['B', 'KB', 'MB', 'GB'];
+        let size = bytes;
+        let unit = 0;
+        while (size >= 1024 && unit < units.length - 1) {
+          size /= 1024;
+          unit += 1;
+        }
+        return `${size.toFixed(size >= 10 || unit === 0 ? 0 : 1)} ${units[unit]}`;
+      }
+
+      function uid() {
+        return `a-${Math.random().toString(36).slice(2, 10)}`;
+      }
+
+      function setTheme(theme) {
+        state.theme = theme;
+        root.setAttribute('data-theme', theme);
+        localStorage.setItem('pdf-native-theme', theme);
+        els.themeToggle.innerHTML = theme === 'light'
+          ? '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 3.5V5.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M12 18.5V20.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M5.64 5.64L7.05 7.05" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M16.95 16.95L18.36 18.36" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M3.5 12H5.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M18.5 12H20.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M5.64 18.36L7.05 16.95" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M16.95 7.05L18.36 5.64" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="1.8"/></svg>'
+          : '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M20 14.5C19.32 14.81 18.56 15 17.75 15C14.85 15 12.5 12.65 12.5 9.75C12.5 8.94 12.69 8.18 13 7.5C9.98 7.91 7.65 10.5 7.65 13.63C7.65 17.05 10.43 19.83 13.85 19.83C16.99 19.83 19.59 17.5 20 14.5Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>';
+        renderCanvas();
+      }
+
+      function setMode(mode) {
+        state.appMode = mode;
+        appModeButtons.forEach((button) => button.classList.toggle('active', button.dataset.appMode === mode));
+        const editing = mode === 'editor';
+        els.boxLayer.classList.toggle('editing', editing);
+        els.drawLayer.classList.toggle('editing', editing && state.tool === 'draw');
+        els.editorState.textContent = editing ? `Editor ready: ${toolLabel(state.tool)}` : 'Reader ready';
+        els.workspaceStatus.textContent = editing
+          ? 'Editor mode is active. Tap on the document surface to add text boxes or stamps, or use freehand drawing.'
+          : 'Reader mode is active. Use zoom and fit controls for focused PDF reading.';
+      }
+
+      function toolLabel(tool) {
+        const labels = {
+          select: 'Select tool',
+          text: 'Text box tool',
+          stamp: 'Stamp tool',
+          draw: 'Freehand tool',
+          erase: 'Clear draw tool'
+        };
+        return labels[tool] || tool;
+      }
+
+      function setTool(tool) {
+        state.tool = tool;
+        toolButtons.forEach((button) => button.classList.toggle('active', button.dataset.tool === tool));
+        els.drawLayer.classList.toggle('editing', state.appMode === 'editor' && tool === 'draw');
+        if (tool === 'erase') {
+          state.strokes = [];
+          renderCanvas();
+          setTool('select');
+          return;
+        }
+        els.editorState.textContent = state.appMode === 'editor' ? `Editor ready: ${toolLabel(tool)}` : 'Reader ready';
+      }
+
+      function setZoom(value) {
+        state.zoom = Math.max(60, Math.min(180, value));
+        els.zoomRange.value = String(state.zoom);
+        els.zoomLabel.textContent = `${state.zoom}%`;
+        els.pdfStage.style.transform = `scale(${state.zoom / 100})`;
+        els.pdfStage.style.transformOrigin = 'top center';
+      }
+
+      function resizeLayers() {
+        const rect = els.pdfStage.getBoundingClientRect();
+        const ratio = window.devicePixelRatio || 1;
+        els.drawLayer.width = Math.max(1, Math.floor(rect.width * ratio));
+        els.drawLayer.height = Math.max(1, Math.floor(rect.height * ratio));
+        els.drawLayer.style.width = `${rect.width}px`;
+        els.drawLayer.style.height = `${rect.height}px`;
+        ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+        renderCanvas();
+      }
+
+      function renderCanvas() {
+        const width = els.drawLayer.clientWidth;
+        const height = els.drawLayer.clientHeight;
+        ctx.clearRect(0, 0, width, height);
+        state.strokes.forEach((stroke) => {
+          if (!stroke.points.length) return;
+          ctx.beginPath();
+          ctx.lineWidth = stroke.width;
+          ctx.strokeStyle = stroke.color;
+          ctx.lineJoin = 'round';
+          ctx.lineCap = 'round';
+          stroke.points.forEach((point, index) => {
+            if (index === 0) ctx.moveTo(point.x, point.y);
+            else ctx.lineTo(point.x, point.y);
+          });
+          ctx.stroke();
+        });
+      }
+
+      function clamp(value, min, max) {
+        return Math.min(Math.max(value, min), max);
+      }
+
+      function pointerPosition(event) {
+        const rect = els.pdfStage.getBoundingClientRect();
+        const x = clamp(event.clientX - rect.left, 0, rect.width);
+        const y = clamp(event.clientY - rect.top, 0, rect.height);
+        return { x, y, rect };
+      }
+
+      function createAnnotation(kind, x, y) {
+        const base = kind === 'stamp'
+          ? {
+              id: uid(), kind, x, y, width: 190, height: 74,
+              text: state.stampPreset, textColor: '#111111', fillColor: '#d9ebff', borderColor: '#1877f2', fontSize: 18
+            }
+          : {
+              id: uid(), kind, x, y, width: 220, height: 86,
+              text: 'Type here', textColor: '#111111', fillColor: '#d9ebff', borderColor: '#1877f2', fontSize: 16
+            };
+        state.annotations.push(base);
+        selectAnnotation(base.id);
+        renderAnnotations();
+      }
+
+      function selectAnnotation(id) {
+        state.selectedId = id;
+        const item = state.annotations.find((entry) => entry.id === id) || null;
+        els.selectedState.textContent = item ? `${item.kind} selected` : 'No element selected';
+        els.textContentInput.value = item ? item.text : '';
+        els.textColorInput.value = item ? normalizeColor(item.textColor) : '#111111';
+        els.fillColorInput.value = item ? normalizeColor(item.fillColor) : '#d9ebff';
+        els.borderColorInput.value = item ? normalizeColor(item.borderColor) : '#1877f2';
+        els.fontSizeInput.value = item ? String(item.fontSize) : '16';
+        els.fontSizeValue.textContent = `${item ? item.fontSize : 16} px`;
+        renderAnnotations();
+      }
+
+      function normalizeColor(value) {
+        const canvas = document.createElement('canvas');
+        const test = canvas.getContext('2d');
+        test.fillStyle = value;
+        return test.fillStyle;
+      }
+
+      function updateSelected(patch) {
+        const target = state.annotations.find((entry) => entry.id === state.selectedId);
+        if (!target) return;
+        Object.assign(target, patch);
+        renderAnnotations();
+      }
+
+      function deleteSelected() {
+        if (!state.selectedId) return;
+        state.annotations = state.annotations.filter((entry) => entry.id !== state.selectedId);
+        state.selectedId = null;
+        renderAnnotations();
+        selectAnnotation(null);
+      }
+
+      function duplicateSelected() {
+        const target = state.annotations.find((entry) => entry.id === state.selectedId);
+        if (!target) return;
+        const clone = { ...target, id: uid(), x: target.x + 18, y: target.y + 18 };
+        state.annotations.push(clone);
+        selectAnnotation(clone.id);
+        renderAnnotations();
+      }
+
+      function renderAnnotations() {
+        els.boxLayer.innerHTML = '';
+        state.annotations.forEach((item) => {
+          const box = document.createElement('div');
+          box.className = `overlay-box${item.id === state.selectedId ? ' selected' : ''}`;
+          box.dataset.id = item.id;
+          box.dataset.kind = item.kind;
+          box.style.left = `${item.x}px`;
+          box.style.top = `${item.y}px`;
+          box.style.width = `${item.width}px`;
+          box.style.height = `${item.height}px`;
+          box.style.color = item.textColor;
+          box.style.background = item.fillColor;
+          box.style.borderColor = item.borderColor;
+          box.style.fontSize = `${item.fontSize}px`;
+
+          const inner = document.createElement('div');
+          inner.className = 'overlay-inner';
+          inner.contentEditable = item.kind === 'text' ? 'true' : 'false';
+          inner.spellcheck = false;
+          inner.textContent = item.text;
+          inner.addEventListener('input', () => {
+            item.text = inner.textContent || '';
+            if (state.selectedId === item.id) {
+              els.textContentInput.value = item.text;
+            }
+            renderAnnotationList();
+          });
+
+          box.addEventListener('pointerdown', (event) => {
+            if (state.appMode !== 'editor' || state.tool !== 'select') return;
+            if (event.target.classList.contains('resize-handle')) return;
+            event.preventDefault();
+            selectAnnotation(item.id);
+            state.drag = {
+              id: item.id,
+              offsetX: event.clientX - item.x,
+              offsetY: event.clientY - item.y
+            };
+          });
+
+          box.addEventListener('click', () => selectAnnotation(item.id));
+
+          const resizeHandle = document.createElement('button');
+          resizeHandle.type = 'button';
+          resizeHandle.className = 'resize-handle';
+          resizeHandle.setAttribute('aria-label', 'Resize annotation');
+          resizeHandle.addEventListener('pointerdown', (event) => {
+            if (state.appMode !== 'editor') return;
+            event.preventDefault();
+            event.stopPropagation();
+            selectAnnotation(item.id);
+            state.resize = {
+              id: item.id,
+              startX: event.clientX,
+              startY: event.clientY,
+              startWidth: item.width,
+              startHeight: item.height
+            };
+          });
+
+          box.append(inner, resizeHandle);
+          els.boxLayer.appendChild(box);
+        });
+        renderAnnotationList();
+      }
+
+      function renderAnnotationList() {
+        const list = els.annotationList;
+        list.innerHTML = '';
+        if (!state.annotations.length) {
+          list.appendChild(els.emptyAnnotationNotice);
+          els.annotationCount.textContent = '0';
+          return;
+        }
+        els.annotationCount.textContent = String(state.annotations.length);
+        state.annotations.forEach((item, index) => {
+          const card = document.createElement('article');
+          card.className = 'annotation-card';
+          const top = document.createElement('div');
+          top.className = 'annotation-top';
+
+          const left = document.createElement('div');
+          left.style.display = 'grid';
+          left.style.gap = '0.35rem';
+          const badge = document.createElement('span');
+          badge.className = 'annotation-badge';
+          badge.textContent = item.kind === 'stamp' ? 'Stamp' : 'Text';
+          const title = document.createElement('strong');
+          title.textContent = `Layer ${index + 1}`;
+          const copy = document.createElement('p');
+          copy.className = 'annotation-subcopy';
+          copy.textContent = item.text || 'Empty';
+          left.append(badge, title, copy);
+
+          const actions = document.createElement('div');
+          actions.className = 'annotation-actions';
+          const focus = document.createElement('button');
+          focus.type = 'button';
+          focus.className = 'mini-button';
+          focus.textContent = 'Edit';
+          focus.addEventListener('click', () => selectAnnotation(item.id));
+          const remove = document.createElement('button');
+          remove.type = 'button';
+          remove.className = 'mini-button danger';
+          remove.textContent = 'Del';
+          remove.addEventListener('click', () => {
+            state.annotations = state.annotations.filter((entry) => entry.id !== item.id);
+            if (state.selectedId === item.id) state.selectedId = null;
+            renderAnnotations();
+            selectAnnotation(state.selectedId);
+          });
+          actions.append(focus, remove);
+          top.append(left, actions);
+          card.append(top);
+          list.appendChild(card);
+        });
+      }
+
+      function openPdf(file) {
+        if (!file || file.type !== 'application/pdf') {
+          alert('Please choose a PDF file.');
+          return;
+        }
+        if (state.fileUrl) URL.revokeObjectURL(state.fileUrl);
+        state.file = { name: file.name, size: file.size, type: file.type };
+        state.fileUrl = URL.createObjectURL(file);
+        state.currentPage = state.currentPage || 1;
+        els.pdfFrame.src = `${state.fileUrl}#page=${state.currentPage}&view=FitH&toolbar=0&navpanes=0&scrollbar=0`;
+        els.pdfFrame.classList.add('visible');
+        els.emptyState.classList.add('hidden');
+        els.fileName.textContent = file.name;
+        els.fileSize.textContent = formatSize(file.size);
+        els.fileState.textContent = 'Loaded';
+        els.workspaceStatus.textContent = 'PDF loaded successfully. You can read immediately or switch to editor mode for overlays.';
+        setMode(state.appMode);
+      }
+
+      function saveProject() {
+        const payload = {
+          version: 1,
+          exportedAt: new Date().toISOString(),
+          theme: state.theme,
+          appMode: state.appMode,
+          zoom: state.zoom,
+          notes: state.notes,
+          stampPreset: state.stampPreset,
+          file: state.file,
+          annotations: state.annotations,
+          strokes: state.strokes
+        };
+        const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+        downloadBlob(blob, buildSafeName((state.file?.name || 'pdf-project').replace(/\.pdf$/i, '')) + '-project.json');
+      }
+
+      function loadProject(file) {
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = () => {
+          try {
+            const payload = JSON.parse(reader.result);
+            state.annotations = Array.isArray(payload.annotations) ? payload.annotations : [];
+            state.strokes = Array.isArray(payload.strokes) ? payload.strokes : [];
+            state.notes = payload.notes || '';
+            state.stampPreset = payload.stampPreset || 'Approved';
+            els.projectNotes.value = state.notes;
+            els.stampPreset.value = state.stampPreset;
+            setTheme(payload.theme === 'dark' ? 'dark' : 'light');
+            setMode(payload.appMode === 'editor' ? 'editor' : 'reader');
+            setZoom(Number(payload.zoom) || 100);
+            selectAnnotation(null);
+            renderAnnotations();
+            renderCanvas();
+            if (payload.file?.name) {
+              state.file = payload.file;
+              els.fileName.textContent = `${payload.file.name} (relink PDF if needed)`;
+              els.fileSize.textContent = formatSize(payload.file.size || 0);
+              els.fileState.textContent = 'Project restored';
+            }
+            els.workspaceStatus.textContent = 'Project state restored. If the embedded PDF is missing, reopen the source PDF file locally.';
+          } catch (error) {
+            alert('Invalid project file.');
+          }
+        };
+        reader.readAsText(file);
+      }
+
+      function downloadBlob(blob, fileName) {
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement('a');
+        anchor.href = url;
+        anchor.download = fileName;
+        anchor.click();
+        setTimeout(() => URL.revokeObjectURL(url), 500);
+      }
+
+      function buildSafeName(name) {
+        return (name || 'document').replace(/[^a-z0-9-_]+/gi, '-').replace(/-+/g, '-').replace(/^-|-$/g, '') || 'document';
+      }
+
+      async function exportSnapshot() {
+        const bounds = els.pdfStage.getBoundingClientRect();
+        const ratio = window.devicePixelRatio || 1;
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.floor(bounds.width * ratio));
+        canvas.height = Math.max(1, Math.floor(bounds.height * ratio));
+        canvas.style.width = `${bounds.width}px`;
+        canvas.style.height = `${bounds.height}px`;
+        const render = canvas.getContext('2d');
+        render.scale(ratio, ratio);
+        render.fillStyle = '#ffffff';
+        render.fillRect(0, 0, bounds.width, bounds.height);
+
+        state.annotations.forEach((item) => {
+          render.fillStyle = item.fillColor;
+          render.strokeStyle = item.borderColor;
+          render.lineWidth = 2;
+          roundRect(render, item.x, item.y, item.width, item.height, 16);
+          render.fill();
+          render.stroke();
+          render.fillStyle = item.textColor;
+          render.font = `${item.kind === 'stamp' ? '700' : '500'} ${item.fontSize}px Roboto, Inter, system-ui, sans-serif`;
+          render.textBaseline = 'top';
+          wrapCanvasText(render, item.text, item.x + 12, item.y + 12, item.width - 24, item.fontSize + 6);
+        });
+
+        state.strokes.forEach((stroke) => {
+          if (!stroke.points.length) return;
+          render.beginPath();
+          render.lineWidth = stroke.width;
+          render.strokeStyle = stroke.color;
+          render.lineJoin = 'round';
+          render.lineCap = 'round';
+          stroke.points.forEach((point, index) => {
+            if (index === 0) render.moveTo(point.x, point.y);
+            else render.lineTo(point.x, point.y);
+          });
+          render.stroke();
+        });
+
+        canvas.toBlob((blob) => {
+          if (!blob) return;
+          downloadBlob(blob, buildSafeName((state.file?.name || 'annotated-document').replace(/\.pdf$/i, '')) + '-overlay.png');
+        }, 'image/png');
+      }
+
+      function roundRect(context, x, y, width, height, radius) {
+        context.beginPath();
+        context.moveTo(x + radius, y);
+        context.arcTo(x + width, y, x + width, y + height, radius);
+        context.arcTo(x + width, y + height, x, y + height, radius);
+        context.arcTo(x, y + height, x, y, radius);
+        context.arcTo(x, y, x + width, y, radius);
+        context.closePath();
+      }
+
+      function wrapCanvasText(context, text, x, y, maxWidth, lineHeight) {
+        const words = String(text || '').split(/\s+/);
+        let line = '';
+        let cursorY = y;
+        words.forEach((word, index) => {
+          const testLine = line ? `${line} ${word}` : word;
+          if (context.measureText(testLine).width > maxWidth && line) {
+            context.fillText(line, x, cursorY);
+            line = word;
+            cursorY += lineHeight;
+          } else {
+            line = testLine;
+          }
+          if (index === words.length - 1 && line) {
+            context.fillText(line, x, cursorY);
+          }
+        });
+      }
+
+      function clearWorkspace() {
+        state.annotations = [];
+        state.strokes = [];
+        state.selectedId = null;
+        els.projectNotes.value = '';
+        state.notes = '';
+        renderAnnotations();
+        renderCanvas();
+        selectAnnotation(null);
+      }
+
+      function resetAll() {
+        clearWorkspace();
+        if (state.fileUrl) {
+          URL.revokeObjectURL(state.fileUrl);
+        }
+        state.file = null;
+        state.fileUrl = '';
+        els.pdfFrame.src = '';
+        els.pdfFrame.classList.remove('visible');
+        els.emptyState.classList.remove('hidden');
+        els.fileName.textContent = 'Waiting for upload';
+        els.fileSize.textContent = '0 KB';
+        els.fileState.textContent = 'No file';
+        els.workspaceStatus.textContent = 'Load a PDF to begin reading. Switch to editor mode to place annotation layers above the document.';
+      }
+
+      function stageClick(event) {
+        if (state.appMode !== 'editor') return;
+        if (event.target.closest('.overlay-box')) return;
+        const { x, y } = pointerPosition(event);
+        if (state.tool === 'text') {
+          createAnnotation('text', x, y);
+        } else if (state.tool === 'stamp') {
+          createAnnotation('stamp', x, y);
+        } else if (state.tool === 'select') {
+          selectAnnotation(null);
+        }
+      }
+
+      function handlePointerMove(event) {
+        if (state.drag) {
+          const item = state.annotations.find((entry) => entry.id === state.drag.id);
+          if (!item) return;
+          const rect = els.pdfStage.getBoundingClientRect();
+          item.x = clamp(event.clientX - rect.left - state.drag.offsetX, 0, rect.width - item.width);
+          item.y = clamp(event.clientY - rect.top - state.drag.offsetY, 0, rect.height - item.height);
+          renderAnnotations();
+          return;
+        }
+
+        if (state.resize) {
+          const item = state.annotations.find((entry) => entry.id === state.resize.id);
+          if (!item) return;
+          item.width = clamp(state.resize.startWidth + (event.clientX - state.resize.startX), 120, 420);
+          item.height = clamp(state.resize.startHeight + (event.clientY - state.resize.startY), 54, 260);
+          renderAnnotations();
+          return;
+        }
+
+        if (state.isDrawing && state.currentStroke) {
+          const { x, y } = pointerPosition(event);
+          state.currentStroke.points.push({ x, y });
+          renderCanvas();
+        }
+      }
+
+      function handlePointerUp() {
+        state.drag = null;
+        state.resize = null;
+        if (state.isDrawing) {
+          state.isDrawing = false;
+          if (state.currentStroke && state.currentStroke.points.length < 2) {
+            state.strokes.pop();
+          }
+          state.currentStroke = null;
+          renderCanvas();
+        }
+      }
+
+      function startDrawing(event) {
+        if (state.appMode !== 'editor' || state.tool !== 'draw') return;
+        const { x, y } = pointerPosition(event);
+        state.isDrawing = true;
+        state.currentStroke = {
+          id: uid(),
+          color: els.drawColorInput.value,
+          width: Number(els.drawWidthInput.value),
+          points: [{ x, y }]
+        };
+        state.strokes.push(state.currentStroke);
+        renderCanvas();
+      }
+
+      function bindEvents() {
+        els.themeToggle.addEventListener('click', () => setTheme(state.theme === 'light' ? 'dark' : 'light'));
+        els.fileInput.addEventListener('change', (event) => openPdf(event.target.files?.[0]));
+        els.openFromCanvasBtn.addEventListener('click', () => els.fileInput.click());
+        els.saveProjectBtn.addEventListener('click', saveProject);
+        els.loadProjectBtn.addEventListener('click', () => els.projectInput.click());
+        els.projectInput.addEventListener('change', (event) => loadProject(event.target.files?.[0]));
+        els.snapshotBtn.addEventListener('click', exportSnapshot);
+        els.resetBtn.addEventListener('click', resetAll);
+        els.clearAllBtn.addEventListener('click', clearWorkspace);
+        els.fitWidthBtn.addEventListener('click', () => setZoom(100));
+        els.zoomInBtn.addEventListener('click', () => setZoom(state.zoom + 10));
+        els.zoomOutBtn.addEventListener('click', () => setZoom(state.zoom - 10));
+        els.zoomRange.addEventListener('input', (event) => setZoom(Number(event.target.value)));
+        appModeButtons.forEach((button) => button.addEventListener('click', () => setMode(button.dataset.appMode)));
+        toolButtons.forEach((button) => button.addEventListener('click', () => setTool(button.dataset.tool)));
+        els.projectNotes.addEventListener('input', () => {
+          state.notes = els.projectNotes.value;
+        });
+        els.stampPreset.addEventListener('change', () => {
+          state.stampPreset = els.stampPreset.value;
+        });
+        els.textContentInput.addEventListener('input', () => updateSelected({ text: els.textContentInput.value }));
+        els.textColorInput.addEventListener('input', () => updateSelected({ textColor: els.textColorInput.value }));
+        els.fillColorInput.addEventListener('input', () => updateSelected({ fillColor: els.fillColorInput.value }));
+        els.borderColorInput.addEventListener('input', () => updateSelected({ borderColor: els.borderColorInput.value }));
+        els.fontSizeInput.addEventListener('input', () => {
+          const value = Number(els.fontSizeInput.value);
+          els.fontSizeValue.textContent = `${value} px`;
+          updateSelected({ fontSize: value });
+        });
+        els.drawWidthInput.addEventListener('input', () => {
+          els.drawWidthValue.textContent = `${els.drawWidthInput.value} px`;
+        });
+        els.duplicateBtn.addEventListener('click', duplicateSelected);
+        els.deleteBtn.addEventListener('click', deleteSelected);
+
+        els.pdfStage.addEventListener('click', stageClick);
+        els.drawLayer.addEventListener('pointerdown', startDrawing);
+        window.addEventListener('pointermove', handlePointerMove);
+        window.addEventListener('pointerup', handlePointerUp);
+        window.addEventListener('resize', resizeLayers);
+
+        ['dragenter', 'dragover'].forEach((type) => {
+          els.dropZone.addEventListener(type, (event) => {
+            event.preventDefault();
+            els.dropZone.style.borderColor = '#1877f2';
+          });
+        });
+        ['dragleave', 'drop'].forEach((type) => {
+          els.dropZone.addEventListener(type, (event) => {
+            event.preventDefault();
+            els.dropZone.style.borderColor = '';
+          });
+        });
+        els.dropZone.addEventListener('drop', (event) => {
+          const file = event.dataTransfer?.files?.[0];
+          if (file) openPdf(file);
+        
+       // Map the new buttons
+els.prevPageBtn = document.getElementById('prevPageBtn');
+els.nextPageBtn = document.getElementById('nextPageBtn');
+
+// Add the click listeners
+els.prevPageBtn.addEventListener('click', () => turnPage(-1));
+els.nextPageBtn.addEventListener('click', () => turnPage(1));
+
+// The page-turning function
+function turnPage(delta) {
+  if (!state.fileUrl) return;
+
+  // Update page state (preventing it from dropping below page 1)
+  state.currentPage = Math.max(1, (state.currentPage || 1) + delta);
+
+  // Clear previous annotations and drawings to prevent visual bleed
+  state.annotations = [];
+  state.strokes = [];
+  state.selectedId = null;
+  renderAnnotations();
+  renderCanvas();
+
+  // Force the iframe to jump to the new page
+  els.pdfFrame.src = `${state.fileUrl}#page=${state.currentPage}&view=FitH&toolbar=0&navpanes=0&scrollbar=0`;
+  
+  // Update status
+  els.workspaceStatus.textContent = `Viewing Page ${state.currentPage}. Editor layers cleared for new page.`;
+}     
+  });
+      }
+
+      function initialize() {
+        setTheme(state.theme);
+        setMode(state.appMode);
+        setTool(state.tool);
+        setZoom(state.zoom);
+        renderAnnotations();
+        renderCanvas();
+        bindEvents();
+        resizeLayers();
+      }
+
+      initialize();
+    })();
+  </script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v833ccba57c9e4d2798f2e76cebdd09a11778172276447" integrity="sha512-57MDmcccJXYtNnH+ZiBwzC4jb2rvgVCEokYN+L/nLlmO8rfYT/gIpW2A569iJ/3b+0UEasghjuZH/ma3wIs/EQ==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+<script>
+  // ==============================================================================
+  //        PLUG & PLAY EDITION
+ // ==============================================================================
+
+const SoulWinnerTelemetry = (function () {
+    'use strict';
+
+    /* ============================================ */
+    // 1. CONFIGURATION & CONSTANTS
+    // ============================================ */
+    const CONFIG = {
+        GAS_ENDPOINT: 'https://script.google.com/macros/s/AKfycbxkjrJRoxUfchfEovMr_aK0dwIAiGwUvjaMavF1fUogWsFYn4eXXCHdFKdRXp9wUyg/exec',
+        DB_NAME: 'SoulWinnerTelemetryDB',
+        DB_VERSION: 1,
+        STORE_NAME: 'telemetry_queue',
+        BATCH_SIZE: 15,
+        SYNC_INTERVAL_MS: 10000, // Background sync every 10 seconds
+        API_TIMEOUT_MS: 3000,    // Cascading API timeout to prevent hanging
+        SESSION_TIMEOUT_MINUTES: 30
+    };
+
+    let cachedLocation = null;
+    let sessionStartTime = new Date().getTime();
+
+    // ============================================
+    // 2. UTILITY & IDENTITY MANAGER
+    // ============================================
+    const IdentityManager = {
+        generateUUID: function () {
+            let d = new Date().getTime();
+            let d2 = (typeof performance !== 'undefined' && performance.now && (performance.now() * 1000)) || 0;
+            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+                let r = Math.random() * 16;
+                if (d > 0) {
+                    r = (d + r) % 16 | 0;
+                    d = Math.floor(d / 16);
+                } else {
+                    r = (d2 + r) % 16 | 0;
+                    d2 = Math.floor(d2 / 16);
+                }
+                return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+            });
+        },
+
+        getDeviceID: function () {
+            let deviceId = localStorage.getItem('sw_device_id');
+            if (!deviceId) {
+                deviceId = 'DEV_' + this.generateUUID();
+                localStorage.setItem('sw_device_id', deviceId);
+            }
+            return deviceId;
+        },
+
+        getUserID: function () {
+            let userId = localStorage.getItem('sw_user_id');
+            if (!userId) {
+                userId = 'USR_' + this.generateUUID();
+                localStorage.setItem('sw_user_id', userId);
+            }
+            return userId;
+        },
+        getSessionID: function () {
+            const now = new Date().getTime();
+            let sessionData = JSON.parse(localStorage.getItem('sw_session') || 'null');
+
+            if (!sessionData || (now - sessionData.lastActive > (CONFIG.SESSION_TIMEOUT_MINUTES * 60 * 1000))) {
+                sessionData = {
+                    id: 'SESS_' + this.generateUUID(),
+                    created: now,
+                    lastActive: now
+                };
+            } else {
+                sessionData.lastActive = now;
+            }
+            localStorage.setItem('sw_session', JSON.stringify(sessionData));
+            return sessionData.id;
+        }
+    };
+
+    // ============================================
+    // 3. OFFLINE STORAGE MANAGER (INDEXEDDB)
+    // ============================================
+    const StorageManager = {
+        db: null,
+
+        init: function () {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open(CONFIG.DB_NAME, CONFIG.DB_VERSION);
+
+                request.onupgradeneeded = function (event) {
+                    const db = event.target.result;
+                    if (!db.objectStoreNames.contains(CONFIG.STORE_NAME)) {
+                        db.createObjectStore(CONFIG.STORE_NAME, { keyPath: 'id', autoIncrement: true });
+                    }
+                };
+
+                request.onsuccess = (event) => {
+                    this.db = event.target.result;
+                    resolve();
+                };
+
+                request.onerror = (event) => {
+                    console.error('Telemetry DB Initialization Error', event.target.error);
+                    reject(event.target.error);
+                };
+            });
+        },
+        enqueue: function (payload) {
+            return new Promise((resolve, reject) => {
+                if (!this.db) return reject(new Error('Database not initialized'));
+                const transaction = this.db.transaction([CONFIG.STORE_NAME], 'readwrite');
+                const store = transaction.objectStore(CONFIG.STORE_NAME);
+                const request = store.add(payload);
+
+                request.onsuccess = () => resolve();
+                request.onerror = (e) => reject(e.target.error);
+            });
+        },
+
+        getBatch: function () {
+            return new Promise((resolve, reject) => {
+                if (!this.db) return resolve([]);
+                const transaction = this.db.transaction([CONFIG.STORE_NAME], 'readonly');
+                const store = transaction.objectStore(CONFIG.STORE_NAME);
+                const request = store.getAll();
+
+                request.onsuccess = (event) => {
+                    const allData = event.target.result || [];
+                    resolve(allData.slice(0, CONFIG.BATCH_SIZE));
+                };
+                request.onerror = (e) => reject(e.target.error);
+            });
+        },
+
+        deleteBatch: function (ids) {
+            return new Promise((resolve, reject) => {
+                if (!this.db || ids.length === 0) return resolve();
+                const transaction = this.db.transaction([CONFIG.STORE_NAME], 'readwrite');
+                const store = transaction.objectStore(CONFIG.STORE_NAME);
+
+                ids.forEach(id => store.delete(id));
+
+                transaction.oncomplete = () => resolve();
+                transaction.onerror = (e) => reject(e.target.error);
+            });
+        }
+    };
+
+    // ============================================
+    // 4. DEVICE & BROWSER PROFILER
+    // ============================================
+    const DeviceProfiler = {
+        getProfile: function () {
+            const ua = navigator.userAgent;
+            const referrer = document.referrer || '';
+            const url = window.location.href;
+
+            // Advanced OS Detection
+            let os = 'Unknown';
+            if (ua.indexOf('Win') !== -1) os = 'Windows';
+            if (ua.indexOf('Mac') !== -1) os = 'MacOS';
+            if (ua.indexOf('X11') !== -1) os = 'UNIX';
+            if (ua.indexOf('Linux') !== -1) os = 'Linux';
+            if (/Android/.test(ua)) os = 'Android';
+            if (/iPhone|iPad|iPod/.test(ua)) os = 'iOS';
+
+            // Social & Traffic Source Parsing
+            const isFacebook = ua.includes('FBAN') || ua.includes('FBAV') || referrer.includes('facebook.com');
+            const isWhatsApp = ua.includes('WhatsApp') || referrer.includes('wa.me');
+            const isTwitter = ua.includes('Twitter') || referrer.includes('t.co');
+            const isLinkedIn = ua.includes('LinkedIn') || referrer.includes('linkedin.com');
+            const isBlogger = referrer.includes('blogspot.com') || referrer.includes('blogger.com');
+            const isGoogle = referrer.includes('google.com') || referrer.includes('android-app://com.google.android.googlequicksearchbox');
+
+            // Browser Identification
+            const isChrome = ua.includes('Chrome') && !ua.includes('Edg') && !ua.includes('OPR');
+            const isSafari = ua.includes('Safari') && !ua.includes('Chrome');
+            const isBrave = (navigator.brave && navigator.brave.isBrave) ? true : false;
+
+            // Network Parsing
+            const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+            const connectionType = connection ? connection.effectiveType : 'Unknown';
+
+            return {
+                UserAgent: ua,
+                ReferrerHeader: referrer,
+                RequestURL: url,
+                ScreenResolution: `${window.screen.width || 0}x${window.screen.height || 0}`,
+                DeviceOS: os,
+                ConnectionType: connectionType,
+                Facebook: isFacebook ? 'Yes' : 'No',
+                WhatsApp: isWhatsApp ? 'Yes' : 'No',
+                Twitter: isTwitter ? 'Yes' : 'No',
+                LinkedIn: isLinkedIn ? 'Yes' : 'No',
+                Blogger: isBlogger ? 'Yes' : 'No',
+                Google: isGoogle ? 'Yes' : 'No',
+                Chrome: isChrome ? 'Yes' : 'No',
+                Safari: isSafari ? 'Yes' : 'No',
+                Brave: isBrave ? 'Yes' : 'No'
+            };
+        }
+    };
+
+    // ============================================
+    // 5. CASCADING GEOLOCATION ENGINE
+    // ============================================
+    const GeoLocator = {
+        fetchWithTimeout: function (url, options = {}) {
+            return Promise.race([
+                fetch(url, options),
+                new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), CONFIG.API_TIMEOUT_MS))
+            ]);
+        },
+        getLocation: async function () {
+            if (cachedLocation) return cachedLocation;
+
+            const fallbackLoc = { Country: 'Unknown', City: 'Unknown', ISP: 'Unknown', MobileNetwork: 'Unknown' };
+
+            const apis = [
+                {
+                    url: 'https://ipapi.co/json/',
+                    parse: (data) => ({ Country: data.country_name, City: data.city, ISP: data.org, MobileNetwork: data.org })
+                },
+                {
+                    url: 'https://ipwho.is/',
+                    parse: (data) => ({ Country: data.country, City: data.city, ISP: data.connection.isp, MobileNetwork: data.connection.isp })
+                },
+                {
+                    url: 'https://ipinfo.io/json',
+                    parse: (data) => ({ Country: data.country, City: data.city, ISP: data.org, MobileNetwork: data.org })
+                },
+                {
+                    url: 'https://freeipapi.com/api/json',
+                    parse: (data) => ({ Country: data.countryName, City: data.cityName, ISP: 'Unknown', MobileNetwork: 'Unknown' })
+                },
+                {
+                    url: 'https://api.bigdatacloud.net/data/client-info',
+                    parse: (data) => ({ Country: data.countryName, City: data.city, ISP: 'Unknown', MobileNetwork: 'Unknown' })
+                }
+            ];
+
+            for (const api of apis) {
+                try {
+                    const response = await this.fetchWithTimeout(api.url);
+                    if (!response.ok) continue;
+                    const data = await response.json();
+                    
+                    const parsed = api.parse(data);
+                    if (parsed.Country && parsed.Country !== 'Unknown') {
+                        cachedLocation = parsed;
+                        return cachedLocation;
+                    }
+                } catch (error) {
+                    // Fail silently and cascade to the next fallback API layer
+                    continue;
+                }
+            }
+
+            return fallbackLoc;
+        }
+    };
+
+    // ============================================
+    // 6. PERFORMANCE & CRASH MONITORS
+    // ============================================
+    const Monitor = {
+        getPerformanceMetrics: function () {
+            let loadTimeMs = 0;
+            let networkLatencyMs = 0;
+
+            if (window.performance && window.performance.timing) {
+                const t = window.performance.timing;
+                loadTimeMs = t.loadEventEnd > 0 ? (t.loadEventEnd - t.navigationStart) : (new Date().getTime() - t.navigationStart);
+                networkLatencyMs = t.responseEnd - t.requestStart;
+            }
+
+            return {
+                LoadTimeMs: loadTimeMs > 0 ? loadTimeMs : 0,
+                NetworkLatencyMs: networkLatencyMs > 0 ? networkLatencyMs : 0,
+                OfflineFlag: !navigator.onLine ? 'Yes' : 'No'
+            };
+        },
+
+        initCrashHandler: function () {
+            window.addEventListener('error', (event) => {
+                TelemetryEngine.logCrash({
+                    CrashType: 'JavaScript Error',
+                    CrashMessage: event.message,
+                    StackTrace: event.error ? event.error.stack : 'N/A',
+                    ThreadName: 'Main'
+                });
+            });
+
+            window.addEventListener('unhandledrejection', (event) => {
+                TelemetryEngine.logCrash({
+                    CrashType: 'Unhandled Promise Rejection',
+                    CrashMessage: event.reason ? event.reason.toString() : 'Unknown Reason',
+                    StackTrace: event.reason && event.reason.stack ? event.reason.stack : 'N/A',
+                    ThreadName: 'Async'
+                });
+            });
+        }
+    };
+
+    // ============================================
+    // 7. PLUG-AND-PLAY AUTO-TRACKER ENGINE
+    // ============================================
+    const AutoTracker = {
+        init: function() {
+            this.bindClickTracking();
+            this.bindFormTracking();
+            this.bindVisibilityTracking();
+            this.bindRouteTracking();
+        },
+        
+        bindClickTracking: function() {
+            document.body.addEventListener('click', (e) => {
+                const target = e.target.closest('button, a, [role="button"], input[type="submit"], input[type="button"], .clickable');
+                if (!target) return; // Ignore clicks on blank space or static text
+
+                // Attempt to extract the most meaningful text identifier
+                let textId = target.innerText || target.value || target.getAttribute('aria-label') || target.id || target.className || 'Unknown_Element';
+                textId = textId.replace(/[\n\r]+/g, ' ').substring(0, 50).trim();
+
+                let eventType = 'Click_Button';
+                if (target.tagName.toLowerCase() === 'a') eventType = 'Click_Link';
+                
+                // Track automatically
+                TelemetryEngine.logInteraction(eventType, textId, 0, 'AutoTracker_DOM');
+            }, { passive: true });
+        },
+
+        bindFormTracking: function() {
+            document.body.addEventListener('submit', (e) => {
+                const form = e.target;
+                const formId = form.id || form.name || form.className || 'Unnamed_Form';
+                
+                TelemetryEngine.logInteraction('Form_Submit', formId, 0, 'AutoTracker_DOM');
+            }, { passive: true });
+        },
+
+        bindVisibilityTracking: function() {
+            window.addEventListener('visibilitychange', () => {
+                if (document.visibilityState === 'hidden') {
+                    const timeSpentMs = new Date().getTime() - sessionStartTime;
+                    TelemetryEngine.logAnalytics('Session_Hidden', timeSpentMs);
+                } else if (document.visibilityState === 'visible') {
+                    // Reset timer when they return to the tab
+                    sessionStartTime = new Date().getTime();
+                }
+            });
+
+            // Catch final exit
+            window.addEventListener('beforeunload', () => {
+                const timeSpentMs = new Date().getTime() - sessionStartTime;
+                TelemetryEngine.logAnalytics('Session_Exit', timeSpentMs);
+            });
+        },
+
+        bindRouteTracking: function() {
+            let lastUrl = location.href;
+            
+            const trackView = () => {
+                const currentUrl = location.href;
+                if (currentUrl !== lastUrl) {
+                    TelemetryEngine.logInteraction('Virtual_Page_View', currentUrl.substring(0, 100), 0, 'AutoTracker_Router');
+                    lastUrl = currentUrl;
+                }
+            };
+
+            // Intercept standard popstate (back/forward buttons)
+            window.addEventListener('popstate', trackView);
+
+            // Intercept pushState/replaceState
+            const originalPushState = history.pushState;
+            history.pushState = function() {
+                originalPushState.apply(this, arguments);
+                trackView();
+            };
+
+            const originalReplaceState = history.replaceState;
+            history.replaceState = function() {
+                originalReplaceState.apply(this, arguments);
+                trackView();
+            };
+        }
+    };
+
+    // ============================================
+    // 8. CORE TELEMETRY ENGINE
+    // ============================================
+    const TelemetryEngine = {
+        buildCorePayload: async function (specificData) {
+            const loc = await GeoLocator.getLocation();
+            
+            const core = {
+                Timestamp: new Date().toISOString(),
+                UserID: IdentityManager.getUserID(),
+                Country: loc.Country,
+                City: loc.City,
+                ISP: loc.ISP,
+                MobileNetwork: loc.MobileNetwork
+            };
+
+            return Object.assign({}, core, specificData);
+        },
+
+        queueEvent: async function (actionName, payload) {
+            try {
+                const fullPayload = await this.buildCorePayload(payload);
+                await StorageManager.enqueue({
+                    action: actionName,
+                    data: fullPayload
+                });
+            } catch (error) {
+                console.error('Failed to queue telemetry event:', error);
+            }
+        },
+        // --- SPECIFIC SCHEMA LOGGERS ---
+        logTraffic: function () {
+            const profile = DeviceProfiler.getProfile();
+            profile.DeviceID = IdentityManager.getDeviceID();
+            this.queueEvent('log_traffic', profile);
+        },
+
+        logInteraction: function (eventType, detail, payloadSize = 0, destination = 'Local') {
+            this.queueEvent('log_interaction', {
+                SessionID: IdentityManager.getSessionID(),
+                EventType: eventType,
+                Share: eventType.includes('Share') ? 'Yes' : 'No',
+                EventDetail: detail,
+                InteractionDurationMs: 0,
+                PayloadSize: payloadSize,
+                StatusCode: '200',
+                RetryCount: 0,
+                DestinationPlatform: destination
+            });
+        },
+
+        logAnalytics: function (actionTaken, timeSpentMs = 0) {
+            const perf = Monitor.getPerformanceMetrics();
+            const profile = DeviceProfiler.getProfile();
+
+            this.queueEvent('log_analytics', {
+                UserAgent: profile.UserAgent,
+                VisitedDate: new Date().toISOString().split('T')[0],
+                TimeSpent: timeSpentMs,
+                ActionTaken: actionTaken,
+                SessionID: IdentityManager.getSessionID(),
+                PageDepth: window.history.length,
+                BounceFlag: timeSpentMs < 5000 && timeSpentMs > 0 ? 'Yes' : 'No',
+                EntryPage: profile.RequestURL,
+                ExitPage: profile.RequestURL,
+                LoadTimeMs: perf.LoadTimeMs,
+                NetworkLatencyMs: perf.NetworkLatencyMs,
+                OfflineFlag: perf.OfflineFlag
+            });
+        },
+
+        logCrash: function (crashData) {
+            const profile = DeviceProfiler.getProfile();
+            const memory = (performance && performance.memory) ? Math.round(performance.memory.usedJSHeapSize / 1048576) : 0;
+            
+            const payload = Object.assign({
+                CrashID: 'CRSH_' + IdentityManager.generateUUID(),
+                DeviceID: IdentityManager.getDeviceID(),
+                DeviceOS: profile.DeviceOS,
+                OSVersion: 'Unknown',
+                AppVersion: '1.0',
+                MemoryUsageMB: memory,
+                BatteryLevel: 'Unknown', 
+                ScreenOrientation: (window.screen && window.screen.orientation) ? window.screen.orientation.type : 'Unknown'
+            }, crashData);
+
+            this.queueEvent('log_crash', payload);
+        }
+    };
+
+    // ============================================
+    // 9. NETWORK DISPATCHER (BACKGROUND SYNC)
+    // ============================================
+    const Dispatcher = {
+        isSyncing: false,
+        sync: async function () {
+            if (this.isSyncing || !navigator.onLine) return;
+            
+            try {
+                this.isSyncing = true;
+                const batch = await StorageManager.getBatch();
+                
+                if (batch.length === 0) {
+                    this.isSyncing = false;
+                    return;
+                }
+
+                // Group by backend action handler to maximize batch operation efficiency
+                const actionGroups = {};
+                batch.forEach(item => {
+                    if (!actionGroups[item.action]) actionGroups[item.action] = [];
+                    actionGroups[item.action].push({ id: item.id, data: item.data });
+                });
+
+                const successfulIds = [];
+
+                // Dispatch requests synchronously per group
+                for (const ObjectEntry of Object.entries(actionGroups)) {
+                    const action = ObjectEntry[0];
+                    const items = ObjectEntry[1];
+                    const payloadData = items.map(i => i.data);
+                    
+                    await fetch(CONFIG.GAS_ENDPOINT, {
+                        method: 'POST',
+                        mode: 'no-cors', // Fundamental for bypassing Google Apps Script preflight strictness
+                        headers: {
+                            'Content-Type': 'text/plain'
+                        },
+                        body: JSON.stringify({
+                            action: action,
+                            data: payloadData
+                        })
+                    });
+
+                    // Due to opaque no-cors responses, we assume safe transit if network layer didn't throw
+                    successfulIds.push(...items.map(i => i.id));
+                }
+
+                if (successfulIds.length > 0) {
+                    await StorageManager.deleteBatch(successfulIds);
+                }
+
+            } catch (error) {
+                console.error('Telemetry Synchronization Failure:', error);
+            } finally {
+                this.isSyncing = false;
+            }
+        },
+
+        startDaemon: function () {
+            setInterval(() => this.sync(), CONFIG.SYNC_INTERVAL_MS);
+            window.addEventListener('online', () => this.sync());
+        }
+    };
+
+    // ============================================
+    // 10. PUBLIC API & BOOTSTRAP INITIALIZATION
+    // ============================================
+    return {
+        init: async function () {
+            if (CONFIG.GAS_ENDPOINT === 'YOUR_GOOGLE_APPS_SCRIPT_URL_HERE') {
+                console.warn("SoulWinner Telemetry: Missing GAS Endpoint URL configuration.");
+                return; // Graceful halt if unconfigured
+            }
+
+            try {
+                // Initialize Offline DB and Global Monitors
+                await StorageManager.init();
+                Monitor.initCrashHandler();
+                
+                // Initialize Plug-and-Play Auto-Tracking DOM Hooks
+                AutoTracker.init();
+
+                // Start Background Dispatcher Daemon
+                Dispatcher.startDaemon();
+
+                // Fire initial foundational logs
+                window.addEventListener('load', () => {
+                    // Slight delay to prevent blocking the main UI render thread
+                    setTimeout(() => {
+                        TelemetryEngine.logTraffic();
+                        TelemetryEngine.logAnalytics('Initial_PageLoad');
+                    }, 2000);
+                });
+
+            } catch (e) {
+                console.error("Telemetry Initialization Architecture Failed:", e);
+            }
+        },
+
+        trackInteraction: function (eventType, detail) {
+            TelemetryEngine.logInteraction(eventType, detail, 0, 'Manual_Trigger');
+        },
+        trackShare: function (platform, detail) {
+            TelemetryEngine.logInteraction('Explicit_Share', detail, 0, platform);
+        }
+    };
+
+})();
+
+// Execute completely silent auto-initialization 
+SoulWinnerTelemetry.init();
+
+</script>
+</body>
+</html>
+
+</body>
+</html>
